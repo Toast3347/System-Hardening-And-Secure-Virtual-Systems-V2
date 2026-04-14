@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using ComicRealmBE.Models.DTO;
+using ComicRealmBE.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ComicRealmBE.Controllers
@@ -8,126 +10,62 @@ namespace ComicRealmBE.Controllers
     [Authorize(Roles = "Admin,SuperAdmin")]
     public class UsersController : ControllerBase
     {
-        private readonly ComicRealmContext _context;
+        private readonly UserService _userService;
 
-        public UsersController(ComicRealmContext context)
+        public UsersController(UserService userService)
         {
-            _context = context;
+            _userService = userService;
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetAll()
         {
-            var users = await _context.Users
-                .AsNoTracking()
-                .Select(u => new UserDto
-                {
-                    UserId = u.UserId,
-                    Email = u.Email,
-                    Role = u.Role,
-                    CreatedBy = u.CreatedBy,
-                    CreatedAt = u.CreatedAt,
-                    UpdatedAt = u.UpdatedAt,
-                    IsActive = u.IsActive
-                })
-                .ToListAsync();
-
+            var users = await _userService.GetAllAsync();
             return Ok(users);
         }
 
         [HttpGet("{id:int}")]
         public async Task<ActionResult<UserDto>> GetById(int id)
         {
-            var user = await _context.Users
-                .AsNoTracking()
-                .Where(u => u.UserId == id)
-                .Select(u => new UserDto
-                {
-                    UserId = u.UserId,
-                    Email = u.Email,
-                    Role = u.Role,
-                    CreatedBy = u.CreatedBy,
-                    CreatedAt = u.CreatedAt,
-                    UpdatedAt = u.UpdatedAt,
-                    IsActive = u.IsActive
-                })
-                .FirstOrDefaultAsync();
-
+            var user = await _userService.GetByIdAsync(id);
             return user is null ? NotFound() : Ok(user);
         }
 
         [HttpPost]
         public async Task<ActionResult<UserDto>> Create(CreateUserDto dto)
         {
-            var user = new User
+            var currentUserRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value;
+
+            var result = await _userService.CreateAsync(dto, currentUserRole);
+            
+            if (result is null)
             {
-                Email = dto.Email,
-                PasswordHash = dto.PasswordHash,
-                Role = dto.Role,
-                CreatedBy = dto.CreatedBy,
-                IsActive = dto.IsActive,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+                return Forbid(); // Indicates RBAC failure in logic for now
+            }
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            var result = new UserDto
-            {
-                UserId = user.UserId,
-                Email = user.Email,
-                Role = user.Role,
-                CreatedBy = user.CreatedBy,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt,
-                IsActive = user.IsActive
-            };
-
-            return CreatedAtAction(nameof(GetById), new { id = user.UserId }, result);
+            return CreatedAtAction(nameof(GetById), new { id = result.UserId }, result);
         }
 
         [HttpPut("{id:int}")]
         public async Task<ActionResult<UserDto>> Update(int id, UpdateUserDto dto)
         {
-            var user = await _context.Users.FindAsync(id);
-            if (user is null)
+            var result = await _userService.UpdateAsync(id, dto);
+            if (result is null)
             {
                 return NotFound();
             }
 
-            user.Email = dto.Email;
-            user.Role = dto.Role;
-            user.CreatedBy = dto.CreatedBy;
-            user.IsActive = dto.IsActive;
-            user.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new UserDto
-            {
-                UserId = user.UserId,
-                Email = user.Email,
-                Role = user.Role,
-                CreatedBy = user.CreatedBy,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt,
-                IsActive = user.IsActive
-            });
+            return Ok(result);
         }
 
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var user = await _context.Users.FindAsync(id);
-            if (user is null)
+            var success = await _userService.DeleteAsync(id);
+            if (!success)
             {
                 return NotFound();
             }
-
-            user.IsActive = false;
-            user.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
 
             return NoContent();
         }
