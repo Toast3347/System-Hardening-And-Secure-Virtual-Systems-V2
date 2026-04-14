@@ -1,0 +1,6 @@
+@ComicRealmBE_HostAddress = http://localhost:5053
+
+GET {{ComicRealmBE_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

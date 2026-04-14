@@ -416,3 +416,43 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+## VUE / FRONTEND 
+# Dependencies
+**/node_modules/
+
+# Build output
+
+**/dist/
+**/build/
+
+# Vite / Vue cache
+**/.vite/
+**/.nuxt/
+**/.output/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+## ENV / SECRETS 
+.env
+.env.*
+*.env
+
+# ASP.NET local config (contains secrets)
+appsettings.Development.json
+appsettings.*.Development.json
+
+# Optional: user secrets
+secrets.json
+
+## DOCKER
+docker-compose.override.yml
+docker-compose.*.local.yml
+
+## DATABASE / LOCAL FILES
+*.sqlite
+*.db
