@@ -37,6 +37,6 @@ namespace ComicRealmBE.Models
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation properties
-        public virtual User CreatedByUser { get; set; } = null!;
+        public virtual UserModel CreatedByUser { get; set; } = null!;
     }
 }
