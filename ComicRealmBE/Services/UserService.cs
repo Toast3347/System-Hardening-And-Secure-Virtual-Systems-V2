@@ -15,9 +15,25 @@ namespace ComicRealmBE.Services
             _context = context;
         }
 
-        public async Task<IEnumerable<UserDto>> GetAllAsync()
+        private IQueryable<UserModel> GetAuthorizedUsers(string? currentUserRole)
         {
-            return await _context.Users
+            // SuperAdmin can only interact with Admins
+            if (currentUserRole == UserRole.SuperAdmin.ToString())
+            {
+                return _context.Users.Where(u => u.Role == UserRole.Admin);
+            }
+            // Admin can only interact with Friends
+            if (currentUserRole == UserRole.Admin.ToString())
+            {
+                return _context.Users.Where(u => u.Role == UserRole.Friend);
+            }
+            // Others get nothing
+            return _context.Users.Where(u => false);
+        }
+
+        public async Task<IEnumerable<UserDto>> GetAllAsync(string? currentUserRole)
+        {
+            return await GetAuthorizedUsers(currentUserRole)
                 .AsNoTracking()
                 .Select(u => new UserDto
                 {
@@ -32,9 +48,9 @@ namespace ComicRealmBE.Services
                 .ToListAsync();
         }
 
-        public async Task<UserDto?> GetByIdAsync(int id)
+        public async Task<UserDto?> GetByIdAsync(int id, string? currentUserRole)
         {
-            return await _context.Users
+            return await GetAuthorizedUsers(currentUserRole)
                 .AsNoTracking()
                 .Where(u => u.UserId == id)
                 .Select(u => new UserDto
@@ -52,14 +68,18 @@ namespace ComicRealmBE.Services
 
         public async Task<UserDto?> CreateAsync(CreateUserDto dto, string? currentUserRole)
         {
-            // RBAC logic
+            // RBAC logic for creating
             if (currentUserRole == UserRole.SuperAdmin.ToString() && dto.Role != UserRole.Admin)
             {
                 return null; // Super admin can only create Admin
             }
-            if (currentUserRole == UserRole.Admin.ToString() && dto.Role == UserRole.SuperAdmin)
+            if (currentUserRole == UserRole.Admin.ToString() && dto.Role != UserRole.Friend)
             {
-                return null; // Admin cannot create SuperAdmin
+                return null; // Admin can only create Friends based on strict rules
+            }
+            if (currentUserRole != UserRole.SuperAdmin.ToString() && currentUserRole != UserRole.Admin.ToString())
+            {
+                return null; // Others cannot create
             }
 
             var user = new UserModel
@@ -88,10 +108,20 @@ namespace ComicRealmBE.Services
             };
         }
 
-        public async Task<UserDto?> UpdateAsync(int id, UpdateUserDto dto)
+        public async Task<UserDto?> UpdateAsync(int id, UpdateUserDto dto, string? currentUserRole)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await GetAuthorizedUsers(currentUserRole).FirstOrDefaultAsync(u => u.UserId == id);
             if (user is null)
+            {
+                return null;
+            }
+
+            // Check if what they are updating to is valid for their role
+            if (currentUserRole == UserRole.SuperAdmin.ToString() && dto.Role != UserRole.Admin)
+            {
+                return null;
+            }
+            if (currentUserRole == UserRole.Admin.ToString() && dto.Role != UserRole.Friend)
             {
                 return null;
             }
@@ -116,9 +146,9 @@ namespace ComicRealmBE.Services
             };
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(int id, string? currentUserRole)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await GetAuthorizedUsers(currentUserRole).FirstOrDefaultAsync(u => u.UserId == id);
             if (user is null)
             {
                 return false;

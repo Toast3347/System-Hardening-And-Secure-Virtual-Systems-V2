@@ -2,6 +2,7 @@
 using ComicRealmBE.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace ComicRealmBE.Controllers
 {
@@ -20,21 +21,23 @@ namespace ComicRealmBE.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetAll()
         {
-            var users = await _userService.GetAllAsync();
+            var currentUserRole = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+            var users = await _userService.GetAllAsync(currentUserRole);
             return Ok(users);
         }
 
         [HttpGet("{id:int}")]
         public async Task<ActionResult<UserDto>> GetById(int id)
         {
-            var user = await _userService.GetByIdAsync(id);
+            var currentUserRole = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+            var user = await _userService.GetByIdAsync(id, currentUserRole);
             return user is null ? NotFound() : Ok(user);
         }
 
         [HttpPost]
         public async Task<ActionResult<UserDto>> Create(CreateUserDto dto)
         {
-            var currentUserRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value;
+            var currentUserRole = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
 
             var result = await _userService.CreateAsync(dto, currentUserRole);
             
@@ -49,7 +52,9 @@ namespace ComicRealmBE.Controllers
         [HttpPut("{id:int}")]
         public async Task<ActionResult<UserDto>> Update(int id, UpdateUserDto dto)
         {
-            var result = await _userService.UpdateAsync(id, dto);
+            var currentUserRole = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+
+            var result = await _userService.UpdateAsync(id, dto, currentUserRole);
             if (result is null)
             {
                 return NotFound();
@@ -61,7 +66,8 @@ namespace ComicRealmBE.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var success = await _userService.DeleteAsync(id);
+            var currentUserRole = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+            var success = await _userService.DeleteAsync(id, currentUserRole);
             if (!success)
             {
                 return NotFound();

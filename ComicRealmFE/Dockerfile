@@ -11,4 +11,4 @@ COPY . .
 
 EXPOSE 5173
 
-CMD ["pnpm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+CMD ["sh", "-c", "CI=true pnpm install --frozen-lockfile --config.confirmModulesPurge=false && pnpm exec vite --host 0.0.0.0 --port 5173"]

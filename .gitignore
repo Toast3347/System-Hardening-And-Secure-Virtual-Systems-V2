@@ -420,6 +420,7 @@ FodyWeavers.xsd
 ## VUE / FRONTEND 
 # Dependencies
 **/node_modules/
+**/.pnpm-store
 
 # Build output
 

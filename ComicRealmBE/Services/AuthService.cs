@@ -20,13 +20,25 @@ namespace ComicRealmBE.Services
             _context = context;
         }
 
-        public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
+        public async Task<UserModel?> ValidateUserAsync(string email, string passwordHash)
         {
             var user = await _context.Users
                 .AsNoTracking()
-                .FirstOrDefaultAsync(u => u.Email == dto.Email && u.IsActive);
+                .FirstOrDefaultAsync(u => u.Email == email && u.IsActive);
 
-            if (user is null || user.PasswordHash != dto.PasswordHash)
+            if (user is null || user.PasswordHash != passwordHash)
+            {
+                return null;
+            }
+
+            return user;
+        }
+
+        public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
+        {
+            var user = await ValidateUserAsync(dto.Email, dto.PasswordHash);
+
+            if (user is null)
             {
                 return null;
             }

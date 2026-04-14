@@ -7,7 +7,7 @@ namespace ComicRealmBE.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize] // All logged in users can see comics
+    [Authorize(Roles = "Admin,Friend")] // Super Admin can't see the comics
     public class ComicsController : ControllerBase
     {
         private readonly ComicService _comicService;
