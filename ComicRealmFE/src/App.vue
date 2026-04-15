@@ -1,85 +1,146 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const router = useRouter()
+
+const isSignedIn = computed(() => authStore.isAuthenticated)
+const canManageUsers = computed(() => authStore.isAdmin || authStore.isSuperAdmin)
+const canSeeComics = computed(() => authStore.isAdmin || authStore.isFriend)
+
+function handleAuthExpired(): void {
+  if (router.currentRoute.value.name !== 'login') {
+    router.push({ name: 'login' })
+  }
+}
+
+async function handleLogout(): Promise<void> {
+  await authStore.logout()
+  await router.push({ name: 'login' })
+}
+
+onMounted(() => {
+  window.addEventListener('comicrealm:auth-expired', handleAuthExpired)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('comicrealm:auth-expired', handleAuthExpired)
+})
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <h1>ComicRealm</h1>
+        <p>Secure comic management with role-based access</p>
+      </div>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
+      <nav class="nav-links">
+        <RouterLink v-if="isSignedIn" to="/">Home</RouterLink>
+        <RouterLink v-if="canManageUsers" to="/users">User Management</RouterLink>
+        <RouterLink v-if="canSeeComics" to="/comics">Comics</RouterLink>
+        <RouterLink v-if="!isSignedIn" to="/login">Login</RouterLink>
       </nav>
-    </div>
-  </header>
 
-  <RouterView />
+      <div class="session-block">
+        <span v-if="isSignedIn && authStore.user" class="session-user">
+          {{ authStore.user.email }} ({{ authStore.user.role }})
+        </span>
+        <button v-if="isSignedIn" class="logout-button" type="button" @click="handleLogout">
+          Logout
+        </button>
+      </div>
+    </header>
+
+    <div class="app-content">
+      <RouterView />
+    </div>
+  </div>
 </template>
 
 <style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.2rem;
 }
 
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
+.brand h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
 }
 
-nav a.router-link-exact-active {
-  color: var(--color-text);
+.brand p {
+  color: var(--muted-text);
+  font-size: 0.9rem;
 }
 
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
+.nav-links {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
 }
 
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
+.nav-links a {
+  color: var(--accent-text);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
 }
 
-nav a:first-of-type {
-  border: 0;
+.nav-links a.router-link-active {
+  background: var(--accent-soft);
 }
 
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
+.session-block {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
 
-  .logo {
-    margin: 0 2rem 0 0;
-  }
+.session-user {
+  color: var(--muted-text);
+  font-size: 0.9rem;
+}
 
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
+.logout-button {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-alt);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
 
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
+.logout-button:hover {
+  background: var(--accent-soft);
+}
 
-    padding: 1rem 0;
-    margin-top: 1rem;
+.app-content {
+  flex: 1;
+}
+
+@media (max-width: 700px) {
+  .app-header {
+    align-items: flex-start;
   }
 }
 </style>
