@@ -1,6 +1,7 @@
 ﻿using ComicRealmBE.DBContext;
 using ComicRealmBE.Models;
 using ComicRealmBE.Models.DTO;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -22,11 +23,20 @@ namespace ComicRealmBE.Services
 
         public async Task<UserModel?> ValidateUserAsync(string email, string passwordHash)
         {
+            var normalizedEmail = email.Trim().ToLowerInvariant();
+
             var user = await _context.Users
                 .AsNoTracking()
-                .FirstOrDefaultAsync(u => u.Email == email && u.IsActive);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail && u.IsActive);
 
-            if (user is null || user.PasswordHash != passwordHash)
+            if (user is null)
+            {
+                return null;
+            }
+
+            var hasher = new PasswordHasher<UserModel>();
+            var result = hasher.VerifyHashedPassword(user, user.PasswordHash, passwordHash);
+            if (result == PasswordVerificationResult.Failed)
             {
                 return null;
             }

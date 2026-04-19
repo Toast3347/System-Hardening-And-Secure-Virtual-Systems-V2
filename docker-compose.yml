@@ -29,6 +29,22 @@ services:
       ConnectionStrings__DefaultConnection: ${COMICREAL_DEFAULT_CONNECTION}
     command: ["dotnet", "ComicRealmBE.dll", "--migrate-only"]
 
+  comicrealm-seed:
+    image: postgres:17-alpine
+    container_name: comicrealm-seed
+    depends_on:
+      comicrealm-migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: comicrealm
+    volumes:
+      - ./scripts:/seed-scripts:ro
+      - ./comic_digital.csv:/seed/comic_digital.csv:ro
+    command: ["psql", "-h", "postgres", "-U", "comicrealm", "-d", "comicrealm", "-f", "/seed-scripts/seed-db.sql"]
+    restart: "no"
+
   comicrealmbe:
     build:
       context: ./ComicRealmBE
@@ -36,6 +52,8 @@ services:
     container_name: comicrealmbe
     depends_on:
       comicrealm-migrate:
+        condition: service_completed_successfully
+      comicrealm-seed:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy

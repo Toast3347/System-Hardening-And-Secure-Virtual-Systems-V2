@@ -2,6 +2,7 @@
 using ComicRealmBE.Models.DTO;
 using ComicRealmBE.Models.Enums;
 using ComicRealmBE.DBContext;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace ComicRealmBE.Services
@@ -85,13 +86,15 @@ namespace ComicRealmBE.Services
             var user = new UserModel
             {
                 Email = dto.Email,
-                PasswordHash = dto.PasswordHash, // Hash should be managed securely
                 Role = dto.Role,
                 CreatedBy = dto.CreatedBy,
                 IsActive = dto.IsActive,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
+
+            var hasher = new PasswordHasher<UserModel>();
+            user.PasswordHash = hasher.HashPassword(user, dto.PasswordHash);
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
