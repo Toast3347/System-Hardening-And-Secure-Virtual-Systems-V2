@@ -31,6 +31,8 @@ async function onSubmit(): Promise<void> {
   } catch (error) {
     if (error instanceof ApiError) {
       errorMessage.value = error.message
+    } else if (error instanceof TypeError) {
+      errorMessage.value = 'Unable to reach the server. Check that the backend is running and CORS is configured.'
     } else {
       errorMessage.value = 'Login failed. Please try again.'
     }
