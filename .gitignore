@@ -456,3 +456,6 @@ docker-compose.*.local.yml
 ## DATABASE / LOCAL FILES
 *.sqlite
 *.db
+
+#csv
+*.csv
