@@ -198,9 +198,15 @@ resource "kubernetes_deployment" "backend" {
             value = "http://+:8080"
           }
 
-          env {
-            name  = "Cors__AllowedOrigins"
-            value = join(",", var.allowed_cors_origins)
+          # .NET binds string[] only from indexed env vars
+          # (Cors__AllowedOrigins__0, __1, ...). A single comma-separated
+          # value binds to null and the BE falls back to its hardcoded default.
+          dynamic "env" {
+            for_each = { for i, origin in var.allowed_cors_origins : i => origin }
+            content {
+              name  = "Cors__AllowedOrigins__${env.key}"
+              value = env.value
+            }
           }
 
           env_from {
