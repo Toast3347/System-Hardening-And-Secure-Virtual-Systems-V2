@@ -1,5 +1,6 @@
 FROM node:24.16.0-alpine3.22
 
+ENV CI=true
 WORKDIR /app
 
 RUN corepack enable
@@ -14,11 +15,6 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 EXPOSE 5173
 
-CMD ["sh", "-c", "CI=true pnpm install --frozen-lockfile --config.confirmModulesPurge=false && pnpm exec vite --host 0.0.0.0 --port 5173"]
+CMD ["pnpm", "exec", "vite", "--host", "0.0.0.0", "--port", "5173"]
 
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD curl -f http://localhost/health || exit 1
-
-FROM alpine:3.20
-
-RUN useradd -m appuser
-USER appuser
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -qO- http://localhost:5173/ >/dev/null || exit 1

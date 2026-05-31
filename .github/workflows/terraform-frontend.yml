@@ -1,0 +1,110 @@
+name: terraform-frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/frontend/**'
+      - 'ComicRealmFE/**'
+      - '.github/workflows/terraform-frontend.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'terraform/frontend/**'
+      - '.github/workflows/terraform-frontend.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_VERSION: '1.9.5'
+  WORKING_DIR: terraform/frontend
+  IMAGE_NAME: comicrealm-frontend
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    outputs:
+      acr_login_server:  ${{ steps.tf_outputs.outputs.acr_login_server }}
+      frontend_app_name: ${{ steps.tf_outputs.outputs.frontend_app_name }}
+      resource_group:    ${{ steps.tf_outputs.outputs.resource_group }}
+      api_base_url:      ${{ steps.tf_outputs.outputs.api_base_url }}
+    env:
+      ARM_USE_OIDC:        'true'
+      ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_image_tag:    ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id:       ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id:       ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform apply
+        if: github.event_name != 'pull_request'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Read outputs
+        id: tf_outputs
+        if: github.event_name != 'pull_request'
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          API_URL=$(terraform output -raw api_base_url)
+          echo "api_base_url=$API_URL" >> "$GITHUB_OUTPUT"
+          # ACR + RG are owned by the backend module; look them up via az.
+          RG="comicrealm-dev-rg"
+          ACR=$(az acr list --resource-group "$RG" --query "[0].loginServer" -o tsv)
+          echo "acr_login_server=$ACR" >> "$GITHUB_OUTPUT"
+          echo "resource_group=$RG" >> "$GITHUB_OUTPUT"
+          echo "frontend_app_name=comicrealm-dev-fe" >> "$GITHUB_OUTPUT"
+
+  build_and_deploy:
+    needs: terraform
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id:       ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id:       ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name "${{ needs.terraform.outputs.acr_login_server }}"
+
+      - name: Build & push image
+        run: |
+          IMAGE="${{ needs.terraform.outputs.acr_login_server }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          docker build \
+            --build-arg VITE_API_BASE_URL="${{ needs.terraform.outputs.api_base_url }}" \
+            -t "$IMAGE" ./ComicRealmFE
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Update Container App image
+        run: |
+          az containerapp update \
+            --name "${{ needs.terraform.outputs.frontend_app_name }}" \
+            --resource-group "${{ needs.terraform.outputs.resource_group }}" \
+            --image "$IMAGE"

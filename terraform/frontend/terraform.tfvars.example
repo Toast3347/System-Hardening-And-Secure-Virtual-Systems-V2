@@ -1,0 +1,17 @@
+project          = "comicrealm"
+environment      = "dev"
+
+kubeconfig_path  = "~/.kube/config"
+kube_context     = "minikube"
+
+# Build inside the minikube docker daemon:
+#   & minikube -p minikube docker-env --shell powershell | Invoke-Expression
+#   docker build -t comicrealm-frontend:local .\ComicRealmFE
+frontend_image    = "comicrealm-frontend:local"
+image_pull_policy = "IfNotPresent"
+
+frontend_node_port = 30173
+target_port        = 5173
+
+# Leave null to use the in-cluster Service DNS of the backend.
+vite_api_base_url_override = null
