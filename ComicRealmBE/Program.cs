@@ -1,3 +1,4 @@
+using ComicRealmBE.Configuration;
 using ComicRealmBE.DBContext;
 using ComicRealmBE.Services;
 using ComicRealmBE.Models;
@@ -11,6 +12,11 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 var migrateOnly = args.Contains("--migrate-only");
+
+// Pull every secret (DB connection string, JWT signing key, issuer, audience)
+// from Vault at startup via the HTTP API. Optional only in Development so the
+// unit-test host can boot without Vault running.
+builder.Configuration.AddVault(optional: builder.Environment.IsDevelopment());
 
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
@@ -45,15 +51,20 @@ builder.Services.AddAuthentication(options =>
     })
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
-        var keyString = builder.Configuration["Jwt:Key"] ?? "superSecretKey_must_be_long_enough_for_hmacsha256@123456";
+        var keyString = builder.Configuration["Jwt:SigningKey"]
+            ?? throw new InvalidOperationException("Jwt:SigningKey is not configured (expected to come from Vault).");
+        var issuer = builder.Configuration["Jwt:Issuer"]
+            ?? throw new InvalidOperationException("Jwt:Issuer is not configured (expected to come from Vault).");
+        var audience = builder.Configuration["Jwt:Audience"]
+            ?? throw new InvalidOperationException("Jwt:Audience is not configured (expected to come from Vault).");
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "ComicRealm",
-            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "ComicRealm",
+            ValidIssuer = issuer,
+            ValidAudience = audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyString))
         };
     })

@@ -13,10 +13,14 @@ image_pull_policy = "IfNotPresent"
 backend_node_port = 30053
 
 postgres_admin_username = "comicrealm"
-postgres_admin_password = "comicrealm"
+# DO NOT commit the password here. Inject it from your secret store:
+#   $env:TF_VAR_postgres_admin_password = (vault kv get -field=postgres_admin_password secret/comicrealm)
+# postgres_admin_password = "<set via TF_VAR_postgres_admin_password>"
 postgres_database_name  = "comicrealm"
 postgres_storage_size   = "2Gi"
 
-jwt_signing_key = "dev-signing-key-change-me-please-32chars"
+# DO NOT commit the signing key here. Inject it from your secret store:
+#   $env:TF_VAR_jwt_signing_key = (vault kv get -field=Jwt__SigningKey secret/comicrealm)
+# jwt_signing_key = "<set via TF_VAR_jwt_signing_key>"
 
 allowed_cors_origins = ["http://localhost:5173", "http://192.168.49.2:30173"]
