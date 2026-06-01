@@ -1,0 +1,1 @@
+path = "envs/registry.tfstate"
