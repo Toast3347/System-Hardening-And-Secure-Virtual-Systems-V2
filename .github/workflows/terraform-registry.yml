@@ -22,9 +22,13 @@ on:
 
 permissions:
   contents: read
-  # Needed for the github provider to manage repo settings + environments.
-  administration: write
-  actions: write
+  # NOTE: managing repo settings + Environments via the GitHub API is NOT
+  # possible with the default GITHUB_TOKEN. Supply a fine-grained PAT (or
+  # GitHub App installation token) as the repo secret TF_GITHUB_TOKEN with:
+  #   - Repository permissions: Administration: read & write,
+  #                             Environments: read & write,
+  #                             Actions: read & write,
+  #                             Metadata: read.
 
 concurrency:
   group: terraform-registry
@@ -60,7 +64,7 @@ jobs:
       - name: Terraform plan
         working-directory: ${{ env.TF_DIR }}
         env:
-          GITHUB_TOKEN:        ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN:        ${{ secrets.TF_GITHUB_TOKEN }}
           TF_VAR_github_owner: ${{ github.repository_owner }}
         run: |
           terraform plan -input=false -no-color \
@@ -71,6 +75,6 @@ jobs:
         if: github.event_name != 'pull_request'
         working-directory: ${{ env.TF_DIR }}
         env:
-          GITHUB_TOKEN:        ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN:        ${{ secrets.TF_GITHUB_TOKEN }}
           TF_VAR_github_owner: ${{ github.repository_owner }}
         run: terraform apply -input=false -auto-approve tfplan
