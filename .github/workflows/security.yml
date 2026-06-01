@@ -92,7 +92,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Trivy filesystem report (table, non-blocking)
+      - name: Trivy filesystem gate (table, fail on CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig,license
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'              # stop immediately on CRITICAL
+          format: table               # human-readable findings in the job log
+
+      - name: Trivy filesystem SARIF (non-blocking, for Code Scanning)
+        if: always()
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
@@ -100,18 +112,7 @@ jobs:
           scanners: vuln,secret,misconfig,license
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: '0'              # report only — surface findings in the log
-          format: table
-
-      - name: Trivy filesystem gate (fail on CRITICAL)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          scanners: vuln,secret,misconfig,license
-          severity: CRITICAL
-          exit-code: '1'              # stop immediately on CRITICAL
-          ignore-unfixed: true
+          exit-code: '0'
           format: sarif
           output: trivy-fs.sarif
 
