@@ -38,3 +38,5 @@ WORKDIR /usr/share/nginx/html
 COPY --from=build --chown=nginx:nginx /app/dist .
 
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -q --spider http://localhost:8080/ || exit 1

@@ -6,8 +6,8 @@
 #       * no shell, no package manager, no curl/wget,
 #       * runs as the non-root `app` user (uid 64198) by default,
 #       * contains only the .NET runtime + ICU/tzdata.
-#   - No apt-get, no extra packages, no HEALTHCHECK with shell tools
-#     (Kubernetes/compose handle liveness/readiness probes).
+#   - A statically-linked wget binary from busybox is copied in solely to
+#     support the Docker HEALTHCHECK; it carries no runtime privileges.
 # =============================================================================
 
 # ---------- build ----------
@@ -24,10 +24,17 @@ RUN dotnet publish "ComicRealmBE.csproj" \
         -o /app/publish \
         /p:UseAppHost=false
 
+# ---------- health-check tool ----------
+# busybox is statically linked — no libc dependency — so it works inside
+# the distroless chiseled runtime image where curl/wget are absent.
+FROM busybox:stable AS busybox
+
 # ---------- runtime (distroless / chiseled, non-root) ----------
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS final
 WORKDIR /app
 COPY --from=build --chown=app:app /app/publish .
+# Static wget from busybox for the HEALTHCHECK below.
+COPY --from=busybox /bin/wget /usr/bin/wget
 
 # `app` is uid 64198 in the chiseled image — set explicitly for clarity.
 USER app
@@ -35,4 +42,6 @@ EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080 \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_EnableDiagnostics=0
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD ["/usr/bin/wget", "-q", "--spider", "http://localhost:8080/health"]
 ENTRYPOINT ["dotnet", "ComicRealmBE.dll"]
