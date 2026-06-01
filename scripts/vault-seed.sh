@@ -13,20 +13,21 @@ set -eu
 : "${JWT_ISSUER:?JWT_ISSUER must be set}"
 : "${JWT_AUDIENCE:?JWT_AUDIENCE must be set}"
 
-payload=$(cat <<JSON
-{
-  "data": {
-    "ConnectionStrings__DefaultConnection": "${COMICREAL_DEFAULT_CONNECTION}",
-    "Jwt__SigningKey": "${JWT_SIGNING_KEY}",
-    "Jwt__Issuer": "${JWT_ISSUER}",
-    "Jwt__Audience": "${JWT_AUDIENCE}"
-  }
-}
-JSON
-)
+if ! command -v jq > /dev/null 2>&1; then
+  echo "ERROR: jq is required but not installed." >&2
+  exit 1
+fi
+
+payload=$(jq -n \
+  --arg conn  "${COMICREAL_DEFAULT_CONNECTION}" \
+  --arg key   "${JWT_SIGNING_KEY}" \
+  --arg iss   "${JWT_ISSUER}" \
+  --arg aud   "${JWT_AUDIENCE}" \
+  '{data: {"ConnectionStrings__DefaultConnection": $conn, "Jwt__SigningKey": $key, "Jwt__Issuer": $iss, "Jwt__Audience": $aud}}')
 
 curl -fsS \
   --header "X-Vault-Token: ${VAULT_TOKEN}" \
+  --header "Content-Type: application/json" \
   --request POST \
   --data "${payload}" \
   "${VAULT_ADDR%/}/v1/secret/data/comicrealm" \
