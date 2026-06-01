@@ -58,7 +58,7 @@ jobs:
     name: semgrep (SAST)
     runs-on: ubuntu-latest
     container:
-      image: returntocorp/semgrep:latest
+      image: returntocorp/semgrep:1.164.0@sha256:5ac65e5366465438a5408699584c605b77f125908adaa5620d8c3e56cfa36e5b
     steps:
       - uses: actions/checkout@v4
 
