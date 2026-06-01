@@ -79,7 +79,7 @@ jobs:
     name: build & push frontend image
     needs: terraform-plan
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'push' && env.TF_ENV || '' }}
+    environment: ${{ github.event_name == 'push' && (github.event.inputs.environment || 'dev') || '' }}
     steps:
       - uses: actions/checkout@v4
 
