@@ -45,7 +45,11 @@ public sealed class VaultConfigurationProvider : ConfigurationProvider
 
     private async Task LoadAsync()
     {
-        using var http = new HttpClient { BaseAddress = new Uri(_source.Address.TrimEnd('/') + "/") };
+        using var http = new HttpClient
+        {
+            BaseAddress = new Uri(_source.Address.TrimEnd('/') + "/"),
+            Timeout = TimeSpan.FromSeconds(10)
+        };
         http.DefaultRequestHeaders.Add("X-Vault-Token", _source.Token);
         http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
