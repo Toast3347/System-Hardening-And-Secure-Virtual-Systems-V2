@@ -66,7 +66,12 @@ resource "kubernetes_deployment" "frontend" {
 
           env {
             name  = "VITE_API_BASE_URL"
-            value = local.api_base_url
+            value = "/api"
+          }
+
+          env {
+            name  = "VITE_API_PROXY_TARGET"
+            value = "http://${data.kubernetes_service_v1.backend.metadata[0].name}.${data.kubernetes_namespace_v1.backend.metadata[0].name}.svc.cluster.local:8080"
           }
         }
       }

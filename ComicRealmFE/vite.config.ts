@@ -15,4 +15,14 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: {
+    proxy: process.env.VITE_API_PROXY_TARGET
+      ? {
+          '/api': {
+            target: process.env.VITE_API_PROXY_TARGET,
+            changeOrigin: true,
+          },
+        }
+      : undefined,
+  },
 })
