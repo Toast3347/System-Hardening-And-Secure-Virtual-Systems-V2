@@ -4,6 +4,7 @@ using ComicRealmBE.Models;
 using ComicRealmBE.Models.Enums;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.CookiePolicy;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -25,6 +26,20 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddDbContext<ComicRealmDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+var jwtKey = builder.Configuration["Jwt:Key"];
+
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    throw new InvalidOperationException("JWT key is missing. Configure Jwt:Key through environment variables, user secrets, or Vault.");
+}
+
+builder.Services.Configure<CookiePolicyOptions>(options =>
+{
+    options.HttpOnly = HttpOnlyPolicy.Always;
+    options.Secure = CookieSecurePolicy.Always;
+    options.MinimumSameSitePolicy = SameSiteMode.Strict;
+});
+
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultScheme = "JWT_OR_COOKIE";
@@ -32,20 +47,24 @@ builder.Services.AddAuthentication(options =>
     })
     .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
     {
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+
         options.Events.OnRedirectToLogin = context =>
         {
-            context.Response.StatusCode = 401; // Return 401 Unauthorized for API rather than redirecting
+            context.Response.StatusCode = 401;
             return Task.CompletedTask;
         };
+
         options.Events.OnRedirectToAccessDenied = context =>
         {
-            context.Response.StatusCode = 403; // Return 403 Forbidden
+            context.Response.StatusCode = 403;
             return Task.CompletedTask;
         };
     })
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
-        var keyString = builder.Configuration["Jwt:Key"] ?? "superSecretKey_must_be_long_enough_for_hmacsha256@123456";
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -54,21 +73,20 @@ builder.Services.AddAuthentication(options =>
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "ComicRealm",
             ValidAudience = builder.Configuration["Jwt:Audience"] ?? "ComicRealm",
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyString))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
     })
     .AddPolicyScheme("JWT_OR_COOKIE", "JWT_OR_COOKIE", options =>
     {
         options.ForwardDefaultSelector = context =>
         {
-            // If the Authorization header starts with 'Bearer ', use JWT.
             string authorization = context.Request.Headers.Authorization.ToString();
+
             if (!string.IsNullOrEmpty(authorization) && authorization.StartsWith("Bearer "))
             {
                 return JwtBearerDefaults.AuthenticationScheme;
             }
 
-            // Otherwise default to Cookies.
             return CookieAuthenticationDefaults.AuthenticationScheme;
         };
     });
@@ -110,12 +128,9 @@ if (migrateOnly)
 }
 
 app.UseHttpsRedirection();
-
+app.UseCookiePolicy();
 app.UseCors("Frontend");
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();
