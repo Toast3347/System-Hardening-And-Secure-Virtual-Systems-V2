@@ -14,9 +14,19 @@ var builder = WebApplication.CreateBuilder(args);
 var migrateOnly = args.Contains("--migrate-only");
 
 // Pull every secret (DB connection string, JWT signing key, issuer, audience)
-// from Vault at startup via the HTTP API. Optional only in Development so the
-// unit-test host can boot without Vault running.
-builder.Configuration.AddVault(optional: builder.Environment.IsDevelopment());
+// from Vault at startup via the HTTP API. In Development Vault is optional and
+// User Secrets act as the fallback so the unit-test host (and `dotnet run`
+// without a Vault sidecar) can still boot. In every other environment Vault
+// is mandatory and the app fails fast if it is unreachable.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddVault(optional: true);
+    builder.Configuration.AddUserSecrets<Program>();
+}
+else
+{
+    builder.Configuration.AddVault(optional: false);
+}
 
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
