@@ -29,19 +29,16 @@ RUN dotnet publish "ComicRealmBE.csproj" \
 # the distroless chiseled runtime image where curl/wget are absent.
 FROM busybox:stable AS busybox
 
-# ---------- runtime (distroless / chiseled, non-root) ----------
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS final
+# ---------- runtime (alpine, non-root) ----------
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 WORKDIR /app
 COPY --from=build --chown=app:app /app/publish .
-# Static wget from busybox for the HEALTHCHECK below.
-COPY --from=busybox /bin/wget /usr/bin/wget
 
-# `app` is uid 64198 in the chiseled image — set explicitly for clarity.
 USER app
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080 \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_EnableDiagnostics=0
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD ["/usr/bin/wget", "-q", "--spider", "http://localhost:8080/health"]
+    CMD wget -q --spider http://localhost:8080/health || exit 1
 ENTRYPOINT ["dotnet", "ComicRealmBE.dll"]
