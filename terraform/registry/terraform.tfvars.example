@@ -1,0 +1,6 @@
+github_owner            = "your-github-handle-or-org"
+github_repository       = "System-Hardening-And-Secure-Virtual-Systems-V2"
+project                 = "comicrealm"
+environments            = ["dev", "tst", "acc", "prd"]
+production_environments = ["prd"]
+production_reviewers    = []

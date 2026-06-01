@@ -71,10 +71,14 @@ variable "aspnetcore_environment" {
 }
 
 variable "jwt_signing_key" {
-  description = "JWT signing key consumed by AuthService."
+  description = "JWT signing key consumed by AuthService. Inject via TF_VAR_jwt_signing_key or a secret-managed tfvars file; no default is provided."
   type        = string
   sensitive   = true
-  default     = "dev-signing-key-change-me-please-32chars"
+  default     = null
+  validation {
+    condition     = var.jwt_signing_key != null && length(var.jwt_signing_key) >= 32
+    error_message = "jwt_signing_key must be supplied (>=32 chars). Use TF_VAR_jwt_signing_key sourced from your secret store."
+  }
 }
 
 variable "postgres_admin_username" {
@@ -84,10 +88,14 @@ variable "postgres_admin_username" {
 }
 
 variable "postgres_admin_password" {
-  description = "Administrator password for Postgres (Flexible Server on Azure / in-cluster on minikube)."
+  description = "Administrator password for Postgres. Inject via TF_VAR_postgres_admin_password from your secret store; no default is provided."
   type        = string
   sensitive   = true
-  default     = "comicrealm"
+  default     = null
+  validation {
+    condition     = var.postgres_admin_password != null && length(var.postgres_admin_password) >= 12
+    error_message = "postgres_admin_password must be supplied (>=12 chars). Use TF_VAR_postgres_admin_password sourced from your secret store."
+  }
 }
 
 variable "postgres_database_name" {
