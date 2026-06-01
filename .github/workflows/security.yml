@@ -1,0 +1,112 @@
+name: security
+
+# Hard security gate. Runs on every PR + push to main.
+# Each scanner is configured to FAIL THE BUILD on its highest severity tier so
+# the pipeline stops immediately when a critical issue is introduced:
+#   - Checkov : IaC misconfig in terraform/**          (HARD_FAIL on CRITICAL/HIGH)
+#   - Semgrep : SAST on backend (C#) + frontend (TS)   (exits non-zero on ERROR rules)
+#   - Trivy   : repo filesystem scan (deps, secrets,   (exit-code 1 on CRITICAL)
+#               IaC, config)
+#
+# All scanners also upload SARIF to GitHub Code Scanning for triage.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'   # weekly Monday re-scan against latest CVE DBs
+
+permissions:
+  contents: read
+  security-events: write   # upload SARIF
+  actions: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checkov:
+    name: checkov (IaC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov on terraform/
+        id: checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform
+          framework: terraform
+          quiet: true
+          soft_fail: false             # any failed check → non-zero exit
+          hard_fail_on: CRITICAL,HIGH  # stop immediately on CRITICAL/HIGH
+          output_format: cli,sarif
+          output_file_path: console,checkov.sarif
+
+      - name: Upload Checkov SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif
+          category: checkov
+
+  semgrep:
+    name: semgrep (SAST)
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        # `--error` exits non-zero on any ERROR-severity finding → pipeline stops.
+        # `--severity ERROR` filters which findings count as blocking.
+        run: |
+          semgrep scan \
+            --config=p/owasp-top-ten \
+            --config=p/security-audit \
+            --config=p/csharp \
+            --config=p/typescript \
+            --config=p/javascript \
+            --config=p/dockerfile \
+            --config=p/secrets \
+            --severity=ERROR \
+            --error \
+            --sarif --output=semgrep.sarif \
+            ComicRealmBE ComicRealmFE
+
+      - name: Upload Semgrep SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  trivy-fs:
+    name: trivy (filesystem)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig,license
+          severity: CRITICAL,HIGH
+          exit-code: '1'              # stop immediately on CRITICAL/HIGH
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-fs.sarif
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs

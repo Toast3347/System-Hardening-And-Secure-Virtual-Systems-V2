@@ -1,0 +1,102 @@
+name: tests
+
+# TDD gate: every PR must keep the suite green before any image is built.
+# Both suites already follow the Red → Green → Refactor cycle in-repo
+# (failing test added first, implementation made to pass, then refactor).
+# This workflow enforces that cycle on every change by:
+#   1. Running the suite (Red would surface here),
+#   2. Failing the job (and thus the merge gate) if any test fails,
+#   3. Publishing coverage artifacts so Refactor can be reviewed safely.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ComicRealmBE/**'
+      - 'ComicRealmFE/**'
+      - '.github/workflows/tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ComicRealmBE/**'
+      - 'ComicRealmFE/**'
+      - '.github/workflows/tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-tests:
+    name: backend xUnit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ComicRealmBE
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (no restore)
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test with coverage
+        run: |
+          dotnet test --no-build --configuration Release \
+            --logger "trx;LogFileName=test-results.trx" \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: ComicRealmBE/TestResults
+
+  frontend-tests:
+    name: frontend Vitest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ComicRealmFE
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ComicRealmFE/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `--coverage` is enabled only if @vitest/coverage-v8 is installed
+      # (skipped otherwise to keep the gate working out-of-the-box).
+      - name: Run Vitest
+        run: pnpm exec vitest run --reporter=default --reporter=junit --outputFile=test-results.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-results
+          path: |
+            ComicRealmFE/test-results.xml

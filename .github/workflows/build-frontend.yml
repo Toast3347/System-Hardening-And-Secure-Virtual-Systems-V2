@@ -31,6 +31,7 @@ permissions:
   contents: read
   packages: write
   id-token: write
+  security-events: write  # upload Trivy SARIF to Code Scanning
 
 concurrency:
   group: build-frontend-${{ github.event.inputs.environment || 'dev' }}
@@ -99,11 +100,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build (and push on main)
+      # Build the image into the local docker daemon first so Trivy can scan
+      # it BEFORE anything is pushed. If the scan fails, the workflow stops
+      # and the push step never runs.
+      - name: Build image (load into local daemon)
         uses: docker/build-push-action@v6
         with:
           context: ./ComicRealmFE
-          push: ${{ github.event_name != 'pull_request' }}
+          load: true
+          push: false
           tags: |
             ${{ steps.img.outputs.ref }}:${{ github.sha }}
             ${{ steps.img.outputs.ref }}:${{ env.TF_ENV }}-latest
@@ -112,3 +117,27 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha
           cache-to:   type=gha,mode=max
+
+      - name: Trivy image scan (fail on CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.img.outputs.ref }}:${{ github.sha }}
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL
+          exit-code: '1'              # stop immediately on CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-frontend.sarif
+
+      - name: Upload Trivy image SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-frontend.sarif
+          category: trivy-image-frontend
+
+      - name: Push image (only when scan passed)
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push ${{ steps.img.outputs.ref }}:${{ github.sha }}
+          docker push ${{ steps.img.outputs.ref }}:${{ env.TF_ENV }}-latest
