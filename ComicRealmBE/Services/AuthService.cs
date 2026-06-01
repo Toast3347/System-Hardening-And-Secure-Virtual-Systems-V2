@@ -66,7 +66,13 @@ namespace ComicRealmBE.Services
 
         public string GenerateJwtToken(UserModel user)
         {
-            var keyString = _config["Jwt:Key"] ?? "superSecretKey_must_be_long_enough_for_hmacsha256@123456";
+            var keyString = _config["Jwt:SigningKey"]
+                ?? throw new InvalidOperationException("Jwt:SigningKey is not configured (expected to come from Vault).");
+            var issuer = _config["Jwt:Issuer"]
+                ?? throw new InvalidOperationException("Jwt:Issuer is not configured (expected to come from Vault).");
+            var audience = _config["Jwt:Audience"]
+                ?? throw new InvalidOperationException("Jwt:Audience is not configured (expected to come from Vault).");
+
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyString));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
@@ -78,8 +84,8 @@ namespace ComicRealmBE.Services
             };
 
             var token = new JwtSecurityToken(
-              issuer: _config["Jwt:Issuer"] ?? "ComicRealm",
-              audience: _config["Jwt:Audience"] ?? "ComicRealm",
+              issuer: issuer,
+              audience: audience,
               claims: claims,
               expires: DateTime.Now.AddMinutes(120),
               signingCredentials: credentials);

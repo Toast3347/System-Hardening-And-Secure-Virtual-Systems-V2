@@ -1,3 +1,4 @@
+using ComicRealmBE.Configuration;
 using ComicRealmBE.DBContext;
 using ComicRealmBE.Services;
 using ComicRealmBE.Models;
@@ -12,6 +13,21 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 var migrateOnly = args.Contains("--migrate-only");
+
+// Pull every secret (DB connection string, JWT signing key, issuer, audience)
+// from Vault at startup via the HTTP API. In Development Vault is optional and
+// User Secrets act as the fallback so the unit-test host (and `dotnet run`
+// without a Vault sidecar) can still boot. In every other environment Vault
+// is mandatory and the app fails fast if it is unreachable.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddVault(optional: true);
+    builder.Configuration.AddUserSecrets<Program>();
+}
+else
+{
+    builder.Configuration.AddVault(optional: false);
+}
 
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
@@ -65,14 +81,15 @@ builder.Services.AddAuthentication(options =>
     })
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
+        var keyString = builder.Configuration["Jwt:Key"] ?? "superSecretKey_must_be_long_enough_for_hmacsha256@123456";
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "ComicRealm",
-            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "ComicRealm",
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
     })
@@ -104,6 +121,8 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddHealthChecks();
+
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -133,4 +152,6 @@ app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health");
+
 app.Run();
