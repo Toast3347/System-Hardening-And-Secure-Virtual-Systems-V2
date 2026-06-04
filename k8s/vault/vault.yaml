@@ -18,6 +18,11 @@ spec:
       labels:
         app: vault
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 1000
+        fsGroup: 1000
       containers:
         - name: vault
           image: hashicorp/vault:1.17
@@ -31,6 +36,11 @@ spec:
           args:
             - "server"
             - "-dev"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
 ---
 apiVersion: v1
 kind: Service

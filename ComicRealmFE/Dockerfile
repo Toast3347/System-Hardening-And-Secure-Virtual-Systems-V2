@@ -24,6 +24,11 @@ COPY . .
 
 ARG VITE_API_BASE_URL=http://localhost:5053/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && chown -R appuser:appgroup /app
+
+USER appuser
 RUN pnpm run build-only
 
 # ---------- runtime (nginx-unprivileged, non-root) ----------
