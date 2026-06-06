@@ -42,6 +42,9 @@ WORKDIR /usr/share/nginx/html
 # Static SPA bundle only — nothing buildable or executable ships in the image.
 COPY --from=build --chown=nginx:nginx /app/dist .
 
+# Hardened server config: security headers, hide version banner, SPA fallback.
+COPY --chown=nginx:nginx nginx/default.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget -q --spider http://localhost:8080/ || exit 1

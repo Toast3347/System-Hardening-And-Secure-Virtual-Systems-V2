@@ -42,11 +42,11 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddDbContext<ComicRealmDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-var jwtKey = builder.Configuration["Jwt:Key"];
+var jwtKey = builder.Configuration["Jwt:SigningKey"];
 
 if (string.IsNullOrWhiteSpace(jwtKey))
 {
-    throw new InvalidOperationException("JWT key is missing. Configure Jwt:Key through environment variables, user secrets, or Vault.");
+    throw new InvalidOperationException("JWT signing key is missing. Configure Jwt:SigningKey through environment variables, user secrets, or Vault.");
 }
 
 builder.Services.Configure<CookiePolicyOptions>(options =>
@@ -81,7 +81,6 @@ builder.Services.AddAuthentication(options =>
     })
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
-        var keyString = builder.Configuration["Jwt:Key"] ?? "superSecretKey_must_be_long_enough_for_hmacsha256@123456";
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,

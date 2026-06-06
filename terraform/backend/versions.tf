@@ -17,6 +17,11 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.32"
     }
+
+    vault = {
+      source  = "hashicorp/vault"
+      version = "~> 4.4"
+    }
   }
 
   # Partial config. Select the env-specific state file with:

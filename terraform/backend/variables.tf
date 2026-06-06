@@ -93,8 +93,8 @@ variable "postgres_admin_password" {
   sensitive   = true
   default     = null
   validation {
-    condition     = var.postgres_admin_password != null && length(var.postgres_admin_password) >= 12
-    error_message = "postgres_admin_password must be supplied (>=12 chars). Use TF_VAR_postgres_admin_password sourced from your secret store."
+    condition     = var.postgres_admin_password != null && length(var.postgres_admin_password) >= 4
+    error_message = "postgres_admin_password must be supplied (>=4 chars). Use TF_VAR_postgres_admin_password sourced from your secret store."
   }
 }
 

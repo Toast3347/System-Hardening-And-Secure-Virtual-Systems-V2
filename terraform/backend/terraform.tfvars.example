@@ -12,15 +12,6 @@ image_pull_policy = "IfNotPresent"
 
 backend_node_port = 30053
 
-provider "vault" {
-  address = "http://127.0.0.1:8200"
-}
-
-data "vault_kv_secret_v2" "secrets" {
-  mount = "secret"
-  name  = "comicrealm/dev"
-}
-
 postgres_admin_username = "comicrealm"
 # DO NOT commit the password here. Inject it from your secret store:
 #   $env:TF_VAR_postgres_admin_password = (vault kv get -field=postgres_admin_password secret/comicrealm)

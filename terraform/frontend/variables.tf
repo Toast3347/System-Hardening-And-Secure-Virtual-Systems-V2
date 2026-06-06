@@ -77,9 +77,9 @@ variable "max_replicas" {
 }
 
 variable "target_port" {
-  description = "Port the FE container listens on."
+  description = "Port the FE container listens on. Matches EXPOSE 8080 in ComicRealmFE/Dockerfile (nginx-unprivileged)."
   type        = number
-  default     = 5173
+  default     = 8080
 }
 
 variable "tags" {
